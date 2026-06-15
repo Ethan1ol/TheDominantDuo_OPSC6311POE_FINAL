@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="250dp"
+    android:viewportWidth="200"
+    android:viewportHeight="250">
+    <!-- Glass Jar Body -->
+    <path
+        android:strokeColor="#88CCCCCC"
+        android:strokeWidth="4"
+        android:pathData="M50,20 L150,20 L160,50 L170,230 C170,240 160,250 150,250 L50,250 C40,250 30,240 30,230 L40,50 Z" />
+    <!-- Lid -->
+    <path
+        android:fillColor="#FF555555"
+        android:pathData="M45,10 L155,10 L155,25 L45,25 Z" />
+</vector>

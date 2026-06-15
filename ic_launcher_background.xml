@@ -1,0 +1,202 @@
+package com.example.opsc_ec.ui
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.util.AttributeSet
+import android.view.View
+import java.util.Calendar
+
+//Helps make the graph
+class CategoryGraphView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null
+) : View(context, attrs) {
+
+    //This is data used by the graph
+    private var months = listOf<String>()
+    private var spent = listOf<Float>()
+    private var min = listOf<Float>()
+    private var max = listOf<Float>()
+
+    // Paints controls how the things are drawn
+
+    //paint for the bars and its colours
+    private val spentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFE67E00.toInt()
+    }
+
+    //min goal paint line
+    private val minPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF4CAF50.toInt()
+        strokeWidth = 4f
+    }
+
+    //max goal paint line
+    private val maxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFF44336.toInt()
+        strokeWidth = 4f
+    }
+
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF000000.toInt()
+        textSize = 55f
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Resieve data
+    fun setData(
+        months: List<String>,
+        spent: List<Float>,
+        min: List<Float>,
+        max: List<Float>
+    ) { //Rearranges all the months so it starts from the current month
+        val fixed = reorderFromCurrentMonth(months, spent, min, max)
+
+        this.months = fixed.first
+        this.spent = fixed.second
+        this.min = fixed.third
+        this.max = fixed.fourth
+
+        requestLayout()
+        invalidate()
+    }
+
+    //Current month
+    private fun getCurrentMonth(): String {
+        val list = listOf(
+            "Jan","Feb","Mar","Apr","May","Jun",
+            "Jul","Aug","Sep","Oct","Nov","Dec"
+        )
+        return list[Calendar.getInstance().get(Calendar.MONTH)]
+    }
+
+    // Starts graph from the current month
+    private fun reorderFromCurrentMonth(
+        months: List<String>,
+        spent: List<Float>,
+        min: List<Float>,
+        max: List<Float>
+    ): Quad<List<String>, List<Float>, List<Float>, List<Float>> {
+
+        val current = getCurrentMonth()
+
+        //finds the position of the current month
+        val index = months.indexOfFirst {
+            it.equals(current, ignoreCase = true)
+        }.takeIf { it >= 0 } ?: 0
+
+        val newMonths = months.drop(index) + months.take(index)
+        val newSpent = spent.drop(index) + spent.take(index)
+        val newMin = min.drop(index) + min.take(index)
+        val newMax = max.drop(index) + max.take(index)
+
+        return Quad(newMonths, newSpent, newMin, newMax)
+    }
+
+    // The text size
+    private fun getTextHeight(paint: Paint): Float {
+        val m = paint.fontMetrics
+        return m.bottom - m.top
+    }
+
+    //Graph sizing
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+
+        val count = maxOf(months.size, spent.size, min.size, max.size)
+
+        //The space between the bars
+        val barSlotWidth = 300
+        val totalWidth = (count * barSlotWidth) + paddingLeft + paddingRight
+
+        val width = resolveSize(totalWidth, widthMeasureSpec)
+
+        // extra height for stacked labels
+        val height = resolveSize(1100, heightMeasureSpec)
+
+        setMeasuredDimension(width, height)
+    }
+
+    // Draws the graph
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+
+        if (spent.isEmpty()) {
+            canvas.drawText("No data available", width / 2f, 100f, textPaint)
+            return
+        }
+
+        val count = minOf(months.size, spent.size, min.size, max.size)
+
+        val barSlotWidth = 300f
+        val barWidth = 100f
+        val halfBar = barWidth / 2f
+
+        val textHeight = getTextHeight(textPaint)
+        val lineGap = 6f
+
+
+        val graphHeight = 500f
+
+        //The biggest number is found to scale the graph
+        val highest = maxOf(
+            (spent.maxOrNull() ?: 0f),
+            (max.maxOrNull() ?: 0f),
+            (min.maxOrNull() ?: 0f),
+            1000f
+        )
+
+        var x = paddingLeft + barSlotWidth / 2f
+
+        for (i in 0 until count) {
+
+            val spentHeight = (spent[i] / highest) * graphHeight
+
+            // Spent bar
+            canvas.drawRect(
+                x - halfBar,
+                graphHeight - spentHeight,
+                x + halfBar,
+                graphHeight,
+                spentPaint
+            )
+
+            // Drawing line for min goal
+            val minY = graphHeight - ((min[i] / highest) * graphHeight)
+            canvas.drawLine(x - 70f, minY, x + 70f, minY, minPaint)
+
+            canvas.drawText("Min ${min[i]}",
+                x,
+                minY - textHeight + textHeight + lineGap,
+                textPaint
+            )
+
+            // Drawing line for max goal
+            val maxY = graphHeight - ((max[i] / highest) * graphHeight)
+            canvas.drawLine(x - 70f, maxY, x + 70f, maxY, maxPaint)
+
+            canvas.drawText("Max ${max[i]}",
+                x,
+                maxY - textHeight + textHeight + lineGap,
+                textPaint
+            )
+
+            // Month name
+            val monthY = graphHeight + textHeight
+            canvas.drawText(months[i], x, monthY, textPaint)
+
+            // Actual amount spent
+            val spentY = monthY + textHeight + lineGap
+            canvas.drawText("R${spent[i]}", x, spentY, textPaint)
+
+            x += barSlotWidth
+        }
+    }
+
+    data class Quad<A, B, C, D>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D
+    )
+}

@@ -1,0 +1,263 @@
+package com.example.opsc_ec.ui
+
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Toast
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.lifecycle.asLiveData
+import com.example.opsc_ec.R
+import com.example.opsc_ec.database.AppDatabase
+import com.example.opsc_ec.database.BudgetRepository
+import com.example.opsc_ec.databinding.FragmentCategoryDetailsBinding
+import com.example.opsc_ec.viewmodel.CategoryViewModel
+import com.example.opsc_ec.viewmodel.CategoryViewModelFactory
+import com.example.opsc_ec.viewmodel.ExpenseViewModel
+import com.example.opsc_ec.viewmodel.ExpenseViewModelFactory
+import java.util.*
+
+class CategoryDetailsFragment : Fragment() {
+
+    private var _binding: FragmentCategoryDetailsBinding? = null
+    private val binding get() = _binding!!
+
+    private var categoryId: Int = -1
+    private var categoryName: String? = null
+    private var userId: Int = 1
+
+    private val viewModel: CategoryViewModel by viewModels {
+        val database = AppDatabase.getDatabase(requireContext())
+        val repository = BudgetRepository(database.appDao())
+        CategoryViewModelFactory(repository)
+    }
+
+    private val expenseViewModel: ExpenseViewModel by viewModels {
+        val database = AppDatabase.getDatabase(requireContext())
+        val repository = BudgetRepository(database.appDao())
+        ExpenseViewModelFactory(repository)
+    }
+
+    private var isGoalCategory: Boolean = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        arguments?.let {
+            categoryId = it.getInt("categoryId", -1)
+            categoryName = it.getString("categoryName")
+            userId = it.getInt("userId", 1)
+        }
+    }
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentCategoryDetailsBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        binding.tvCategoryNameDetail.text = categoryName ?: "Unknown"
+
+        // We'll set the adapter later once we know if it's a goal
+        binding.rvExpenses.layoutManager = LinearLayoutManager(requireContext())
+
+        setupMonthSpinner()
+
+        // Observe category totals to show badge and Jar
+        viewModel.getCategoriesWithTotalsForPeriod(userId, 0L, System.currentTimeMillis()).observe(viewLifecycleOwner) { categories ->
+            val category = categories.find { it.id == categoryId }
+            category?.let {
+                val spent = it.totalAmount ?: 0.0
+                val isGoal = it.isGoal
+                isGoalCategory = isGoal
+
+                // Re-setup adapter with correct color logic
+                val adapter = ExpenseAdapter({ expense ->
+                    if (!isGoal) showUpdateSpentDialog(expense.id, expense.name, expense.maxGoal)
+                }, isGoal)
+                binding.rvExpenses.adapter = adapter
+                refreshExpenseList(adapter, binding.spinnerMonth.selectedItemPosition)
+                
+                if (isGoal) {
+                    val target = it.targetAmount
+                    val progress = if (target > 0) (spent / target).coerceIn(0.0, 1.0) else 0.0
+                    
+                    binding.clJarContainer.visibility = View.VISIBLE
+                    binding.btnAddExpense.text = getString(R.string.add_savings)
+                    
+                    // Update Jar Fill Height
+                    val params = binding.ivJarFill.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+                    params.matchConstraintPercentHeight = progress.toFloat()
+                    binding.ivJarFill.layoutParams = params
+                    
+                    binding.tvSavedPercent.text = getString(R.string.percent_format, (progress * 100).toInt())
+                    
+                    // Badge logic for goals
+                    if (progress >= 1.0) {
+                        binding.tvDetailBadge.visibility = View.VISIBLE
+                        binding.tvDetailBadge.text = getString(R.string.goal_reached_badge)
+                    } else {
+                        binding.tvDetailBadge.visibility = View.GONE
+                    }
+
+                } else {
+                    val max = it.maxGoal ?: 0.0
+                    binding.clJarContainer.visibility = View.GONE
+                    binding.btnAddExpense.text = getString(R.string.add_expense)
+                    
+                    if ((spent <= max) && (max > 0)) {
+                        if (binding.tvDetailBadge.visibility != View.VISIBLE) {
+                            binding.tvDetailBadge.visibility = View.VISIBLE
+                            val animation = android.view.animation.AnimationUtils.loadAnimation(requireContext(), R.anim.badge_bounce)
+                            binding.tvDetailBadge.startAnimation(animation)
+                        }
+                    } else {
+                        binding.tvDetailBadge.visibility = View.GONE
+                    }
+                }
+            }
+        }
+
+        binding.btnAddExpense.setOnClickListener {
+            if (isGoalCategory) {
+                showAddSavingsDialog()
+            } else {
+                val bundle = Bundle().apply {
+                    putInt("categoryId", categoryId)
+                    putString("categoryName", categoryName)
+                    putInt("userId", userId)
+                }
+                findNavController().navigate(R.id.action_CategoryDetailsFragment_to_ExpenseFragment, bundle)
+            }
+        }
+    }
+
+    private fun showAddSavingsDialog() {
+        val layout = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 10)
+        }
+
+        val nameInput = android.widget.EditText(requireContext()).apply {
+            hint = "Savings Name (e.g. Deposit)"
+        }
+        val amountInput = android.widget.EditText(requireContext()).apply {
+            hint = "Amount (R)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+
+        layout.addView(nameInput)
+        layout.addView(amountInput)
+
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("Add Savings")
+            .setView(layout)
+            .setPositiveButton("Add") { dialog, _ ->
+                val name = nameInput.text.toString().trim()
+                val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
+
+                if ((name.isNotEmpty()) && (amount > 0)) {
+                    // Save as a simplified expense entry
+                    val now = System.currentTimeMillis()
+                    expenseViewModel.saveExpense(
+                        name = name,
+                        description = "Savings Deposit",
+                        minGoal = 0.0,
+                        maxGoal = 0.0,
+                        startDate = now,
+                        endDate = now,
+                        categoryId = categoryId,
+                        userId = userId,
+                        photoPath = null,
+                        priority = 0,
+                        actualSpent = amount,
+                    )
+                    Toast.makeText(requireContext(), "Savings Added!", Toast.LENGTH_SHORT).show()
+                    // The observer on getCategoriesWithTotalsForPeriod will automatically trigger
+                    // and update the Jar filling level instantly.
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun setupMonthSpinner() {
+        val months = arrayOf("All", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        val spinnerAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, months)
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.spinnerMonth.adapter = spinnerAdapter
+
+        binding.spinnerMonth.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val adapter = binding.rvExpenses.adapter as? ExpenseAdapter
+                if (adapter != null) {
+                    refreshExpenseList(adapter, position)
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun refreshExpenseList(adapter: ExpenseAdapter, position: Int) {
+        if (position == 0) {
+            viewModel.getExpensesForCategory(categoryId).observe(viewLifecycleOwner) { expenses ->
+                adapter.submitList(expenses)
+            }
+        } else {
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.MONTH, position - 1)
+            calendar.set(Calendar.DAY_OF_MONTH, 1)
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            val rangeStart = calendar.timeInMillis
+
+            calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
+            calendar.set(Calendar.HOUR_OF_DAY, 23)
+            calendar.set(Calendar.MINUTE, 59)
+            calendar.set(Calendar.SECOND, 59)
+            calendar.set(Calendar.MILLISECOND, 999)
+            val rangeEnd = calendar.timeInMillis
+
+            viewModel.getExpensesForCategoryAndPeriod(categoryId, rangeStart, rangeEnd).observe(viewLifecycleOwner) { expenses ->
+                adapter.submitList(expenses)
+            }
+        }
+    }
+
+    private fun showUpdateSpentDialog(expenseId: Int, expenseName: String, maxGoal: Double) {
+        val builder = android.app.AlertDialog.Builder(requireContext())
+        builder.setTitle("Update Spent for $expenseName")
+        builder.setMessage("Enter the actual amount spent. Max Goal is R $maxGoal")
+        
+        val input = android.widget.EditText(requireContext())
+        input.hint = "Amount Spent"
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        builder.setView(input)
+
+        builder.setPositiveButton("Update") { dialog, _ ->
+            val spent = input.text.toString().toDoubleOrNull()
+            if (spent != null) {
+                expenseViewModel.updateActualSpent(expenseId, spent)
+                Toast.makeText(requireContext(), "Spent amount updated", Toast.LENGTH_SHORT).show()
+            }
+            dialog.dismiss()
+        }
+        builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+        builder.show()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}

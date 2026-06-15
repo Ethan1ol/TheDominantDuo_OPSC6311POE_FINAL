@@ -1,0 +1,401 @@
+package com.example.opsc_ec.ui
+
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Toast
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.navigation.fragment.findNavController
+import com.example.opsc_ec.R
+import com.example.opsc_ec.database.AppDatabase
+import com.example.opsc_ec.database.BudgetRepository
+import com.example.opsc_ec.databinding.FragmentCategoryBinding
+import com.example.opsc_ec.viewmodel.CategoryViewModel
+import com.example.opsc_ec.viewmodel.CategoryViewModelFactory
+import java.util.Calendar
+
+
+class CategoryFragment : Fragment() {
+
+
+    private var _binding: FragmentCategoryBinding? = null
+    private val binding get() = _binding!!
+
+
+    private var currentUserId = 1
+
+
+    private lateinit var categoryAdapter: CategoryAdapter
+
+
+    private val viewModel: CategoryViewModel by viewModels {
+
+        val database = AppDatabase.getDatabase(requireContext())
+        val repository = BudgetRepository(database.appDao())
+
+        CategoryViewModelFactory(repository)
+    }
+
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        arguments?.let {
+
+            currentUserId = it.getInt(
+                "userId",
+                1
+            )
+        }
+    }
+
+
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+
+
+        _binding =
+            FragmentCategoryBinding.inflate(
+                inflater,
+                container,
+                false
+            )
+
+        return binding.root
+    }
+
+
+
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?
+    ) {
+
+
+        setupRecyclerView()
+
+        setupMonthSpinner()
+
+        loadCurrentMonth()
+
+        binding.btnAddCategory.setOnClickListener {
+
+            showAddCategoryDialog()
+
+        }
+
+    }
+
+
+
+   //This sets up what happens when u click the category
+    private fun setupRecyclerView(){
+
+
+        categoryAdapter = CategoryAdapter { category -> // When clicked it gives the specific category
+
+
+            val bundle = Bundle().apply { // stores the information to be shown on another screen
+
+                putInt("categoryId", category.id
+                )
+
+                putString("categoryName", category.name
+                )
+
+                putInt("userId", currentUserId
+                )
+            }
+
+
+
+            findNavController().navigate( //moves to the page that give details of the category/ Subcategoies
+                R.id.action_CategoryFragment_to_CategoryDetailsFragment,
+                bundle
+            )
+        }
+
+
+
+        binding.rvCategories.apply { //shows categories below each other
+
+            adapter = categoryAdapter
+
+            layoutManager = LinearLayoutManager(requireContext())
+
+        }
+    }
+
+
+
+
+    //The drop down to see the months, also known as spinner
+    private fun setupMonthSpinner(){
+
+        val months = arrayOf(
+
+            "All", "Jan", "Feb", "Mar", "Apr", "May",
+            "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+            "Dec"
+        )
+
+
+
+        binding.spinnerMonthCategory.adapter =
+            ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                months
+            )
+
+
+
+        binding.spinnerMonthCategory
+            .onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener{
+
+
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ){
+
+                    if(position == 0){
+
+                        loadCategories(0L, System.currentTimeMillis()
+                        )
+
+                        loadGraph(0L, System.currentTimeMillis()
+                        )
+
+                    }else{
+                        val dates = getMonthDates(position)
+
+                        loadCategories(
+                            dates.first,
+                            dates.second
+                        )
+
+                        loadGraph(
+                            dates.first,
+                            dates.second
+                        )
+                    }
+                }
+
+
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ){}
+            }
+    }
+
+
+
+
+
+ //Shows the initual current month
+    private fun loadCurrentMonth(){
+
+
+        val calendar = Calendar.getInstance()
+
+        calendar.set(
+            Calendar.DAY_OF_MONTH, 1
+        )
+
+
+        val start = calendar.timeInMillis
+        val end = System.currentTimeMillis()
+
+        loadGraph(start,end)
+     loadGraph(start,end)
+
+    }
+
+
+
+
+
+//This gets the range in which the month lies in
+    private fun getMonthDates(month:Int):Pair<Long,Long>{
+
+        val calendar = Calendar.getInstance()
+
+        calendar.set(Calendar.MONTH, month-1)
+        calendar.set(Calendar.DAY_OF_MONTH, 1)
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+
+        val start = calendar.timeInMillis
+
+
+        calendar.set(
+            Calendar.DAY_OF_MONTH, calendar.getActualMaximum(
+                Calendar.DAY_OF_MONTH))
+
+        calendar.set(Calendar.HOUR_OF_DAY, 23)
+        calendar.set(Calendar.MINUTE, 59)
+        calendar.set(Calendar.SECOND, 59)
+
+        val end =
+            calendar.timeInMillis
+
+        return Pair(
+            start,
+            end
+        )
+
+    }
+
+
+
+
+
+
+
+  //Loads details into recycleview
+    private fun loadCategories(
+        start:Long,
+        end:Long
+    ){
+        viewModel.getCategoriesWithTotalsForPeriod(
+            currentUserId,
+            start,
+            end
+        )
+            .observe(viewLifecycleOwner){ categories ->
+                categoryAdapter.submitList(categories.toList()
+                )
+            }}
+
+
+
+
+
+
+   // Loads details into the graph
+   private fun loadGraph(
+       start: Long,
+       end: Long
+   ){
+
+       viewModel.getCategoriesWithTotalsForPeriod(
+           currentUserId,
+           start,
+           end
+       )
+           .observe(viewLifecycleOwner){ categories ->
+
+
+               binding.categoryGraph.setData(
+
+
+                   categories.map { it.name
+                   },
+
+                   categories.map { (it.totalAmount ?: 0.0).toFloat()
+                   },
+
+                   categories.map { (it.minGoal ?: 0.0).toFloat()
+                   },
+
+                   categories.map { (it.maxGoal ?: 0.0).toFloat()
+                   }
+               ) }
+   }
+
+
+
+  //Allows you to add categories
+    private fun showAddCategoryDialog(){
+        val layout = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 10)
+        }
+
+        val nameInput = android.widget.EditText(requireContext()).apply {
+            hint = "Category Name"
+        }
+        val priorityInput = android.widget.EditText(requireContext()).apply {
+            hint = "Priority (0-9)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+        }
+
+        val isGoalCheckbox = android.widget.CheckBox(requireContext()).apply {
+            text = getString(R.string.is_savings_goal)
+        }
+
+        val targetAmountInput = android.widget.EditText(requireContext()).apply {
+            hint = getString(R.string.target_amount_hint)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            visibility = View.GONE
+        }
+
+        isGoalCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            targetAmountInput.visibility = if (isChecked) android.view.View.VISIBLE else android.view.View.GONE
+        }
+
+        layout.addView(nameInput)
+        layout.addView(priorityInput)
+        layout.addView(isGoalCheckbox)
+        layout.addView(targetAmountInput)
+
+
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("Add New Category")
+            .setView(layout)
+            .setPositiveButton("Add"){dialog,_ ->
+
+                val name = nameInput.text.toString().trim()
+                val priorityStr = priorityInput.text.toString().trim()
+                val priority = priorityStr.toIntOrNull() ?: 0
+                val isGoal = isGoalCheckbox.isChecked
+                val targetAmount = targetAmountInput.text.toString().toDoubleOrNull() ?: 0.0
+
+                if(name.isNotEmpty()){
+
+                    viewModel.addCategory(name, currentUserId, priority, isGoal, targetAmount)
+
+                    Toast.makeText(
+                        requireContext(),
+                        "Category added",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                }
+                dialog.dismiss()
+
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+
+
+
+    override fun onDestroyView(){
+        super.onDestroyView()
+        _binding = null
+
+    }
+
+}

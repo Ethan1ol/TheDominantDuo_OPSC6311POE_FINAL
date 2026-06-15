@@ -1,0 +1,58 @@
+package com.example.opsc_ec.viewmodel
+
+import androidx.lifecycle.*
+import com.example.opsc_ec.database.Category
+import com.example.opsc_ec.database.CategoryWithTotal
+import com.example.opsc_ec.database.Expense
+import com.example.opsc_ec.database.BudgetRepository
+import kotlinx.coroutines.launch
+
+class CategoryViewModel(private val repository: BudgetRepository) : ViewModel() {
+
+    fun addCategory(name: String, userId: Int, priority: Int = 0, isGoal: Boolean = false, targetAmount: Double = 0.0) {
+        viewModelScope.launch {
+            val newCategory = Category(
+                name = name,
+                userId = userId,
+                priority = priority,
+                isGoal = isGoal,
+                targetAmount = targetAmount
+            )
+            repository.insertCategory(newCategory)
+        }
+    }
+
+    fun getExpensesForCategory(categoryId: Int): LiveData<List<Expense>> {
+        return repository.getExpensesForCategory(categoryId).asLiveData()
+    }
+
+    fun getExpensesForCategoryAndPeriod(categoryId: Int, rangeStart: Long, rangeEnd: Long): LiveData<List<Expense>> {
+        return repository.getExpensesForCategoryAndPeriod(categoryId, rangeStart, rangeEnd).asLiveData()
+    }
+
+    fun getCategoriesWithTotalsForPeriod(
+        userId: Int,
+        startDate: Long,
+        endDate: Long
+    ): LiveData<List<CategoryWithTotal>> {
+
+        return repository.getCategoriesWithTotalsForPeriod(
+            userId,
+            startDate,
+            endDate
+        ).asLiveData()
+
+    }
+
+
+}
+
+class CategoryViewModelFactory(private val repository: BudgetRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(CategoryViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return CategoryViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}

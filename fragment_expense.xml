@@ -1,0 +1,56 @@
+package com.example.opsc_ec.viewmodel
+
+import androidx.lifecycle.*
+import com.example.opsc_ec.database.Expense
+import com.example.opsc_ec.database.BudgetRepository
+import kotlinx.coroutines.launch
+
+class ExpenseViewModel(private val repository: BudgetRepository) : ViewModel() {
+
+    fun saveExpense(
+        name: String,
+        description: String,
+        minGoal: Double,
+        maxGoal: Double,
+        startDate: Long,
+        endDate: Long,
+        categoryId: Int,
+        userId: Int,
+        photoPath: String?,
+        priority: Int = 0,
+        actualSpent: Double = 0.0
+    ) {
+        viewModelScope.launch {
+            val expense = Expense(
+                name = name,
+                description = description,
+                minGoal = minGoal,
+                maxGoal = maxGoal,
+                actualSpent = actualSpent,
+                startDate = startDate,
+                endDate = endDate,
+                categoryId = categoryId,
+                userId = userId,
+                photoPath = photoPath,
+                priority = priority
+            )
+            repository.insertExpense(expense)
+        }
+    }
+
+    fun updateActualSpent(expenseId: Int, amount: Double) {
+        viewModelScope.launch {
+            repository.updateActualSpent(expenseId, amount)
+        }
+    }
+}
+
+class ExpenseViewModelFactory(private val repository: BudgetRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ExpenseViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return ExpenseViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}

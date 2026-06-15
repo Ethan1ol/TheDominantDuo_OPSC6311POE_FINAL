@@ -1,0 +1,83 @@
+package com.example.opsc_ec.ui
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.example.opsc_ec.database.CategoryWithTotal
+import com.example.opsc_ec.database.Expense
+import com.example.opsc_ec.databinding.ItemExpenseBinding
+import java.text.SimpleDateFormat
+import java.util.*
+
+class ExpenseAdapter(
+    private val onExpenseClick: (Expense) -> Unit,
+    private val isGoal: Boolean = false
+) :
+    ListAdapter<Expense, ExpenseAdapter.ExpenseViewHolder>(ExpenseDiffCallback()) {
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ExpenseViewHolder {
+        val binding = ItemExpenseBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return ExpenseViewHolder(binding, onExpenseClick, isGoal)
+    }
+
+    override fun onBindViewHolder(holder: ExpenseViewHolder, position: Int) {
+        holder.bind(getItem(position))
+    }
+
+    class ExpenseViewHolder(
+        private val binding: ItemExpenseBinding,
+        private val onExpenseClick: (Expense) -> Unit,
+        private val isGoal: Boolean
+    ) : RecyclerView.ViewHolder(binding.root) {
+
+        private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
+        fun bind(expense: Expense) {
+            binding.tvExpenseName.text = expense.name
+            binding.tvExpenseAmount.text = String.format(Locale.getDefault(), "Spent: R %.2f", expense.actualSpent)
+            binding.tvExpensePriority.text = "Prio: ${expense.priority}"
+            
+            val dateRange = "${dateFormat.format(Date(expense.startDate))} - ${dateFormat.format(Date(expense.endDate))}"
+            binding.tvExpenseDate.text = dateRange
+            
+            binding.tvDateAdded.text = "Created on: ${dateFormat.format(Date(expense.dateAdded))}"
+
+            // Goal Color logic
+            val context = itemView.context
+            if (isGoal) {
+                // Savings should always be green
+                binding.tvExpenseName.setTextColor(ContextCompat.getColor(context, android.R.color.holo_green_dark))
+                binding.tvExpenseAmount.setTextColor(ContextCompat.getColor(context, android.R.color.holo_green_dark))
+            } else if (expense.actualSpent > expense.maxGoal) {
+                binding.tvExpenseName.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_dark))
+                binding.tvExpenseAmount.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_dark))
+            } else if (expense.actualSpent > 0) {
+                binding.tvExpenseName.setTextColor(ContextCompat.getColor(context, android.R.color.holo_green_dark))
+                binding.tvExpenseAmount.setTextColor(ContextCompat.getColor(context, android.R.color.holo_green_dark))
+            } else {
+                // Neutral if nothing spent yet
+                binding.tvExpenseName.setTextColor(ContextCompat.getColor(context, android.R.color.black))
+                binding.tvExpenseAmount.setTextColor(ContextCompat.getColor(context, android.R.color.darker_gray))
+            }
+
+            if (expense.photoPath != null) {
+                binding.ivExpenseItemPhoto.visibility = View.VISIBLE
+                Glide.with(itemView.context).load(expense.photoPath).centerCrop().override(200, 200).into(binding.ivExpenseItemPhoto)
+            } else {
+                binding.ivExpenseItemPhoto.visibility = View.GONE
+            }
+            
+            binding.root.setOnClickListener { onExpenseClick(expense) }
+        }
+    }
+
+    class ExpenseDiffCallback : DiffUtil.ItemCallback<Expense>() {
+        override fun areItemsTheSame(oldItem: Expense, newItem: Expense): Boolean = oldItem.id == newItem.id
+        override fun areContentsTheSame(oldItem: Expense, newItem: Expense): Boolean = oldItem == newItem
+    }
+}

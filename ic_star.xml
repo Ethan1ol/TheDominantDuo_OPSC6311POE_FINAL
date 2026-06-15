@@ -1,0 +1,148 @@
+package com.example.opsc_ec.ui
+
+import android.app.DatePickerDialog
+import android.net.Uri
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.navigation.fragment.findNavController
+import com.bumptech.glide.Glide
+import com.example.opsc_ec.database.AppDatabase
+import com.example.opsc_ec.database.BudgetRepository
+import com.example.opsc_ec.databinding.FragmentExpenseBinding
+import com.example.opsc_ec.viewmodel.ExpenseViewModel
+import com.example.opsc_ec.viewmodel.ExpenseViewModelFactory
+import java.text.SimpleDateFormat
+import java.util.*
+
+class ExpenseFragment : Fragment() {
+
+    private var _binding: FragmentExpenseBinding? = null
+    private val binding get() = _binding!!
+    
+    private var categoryId: Int = -1
+    private var categoryName: String? = null
+    private var currentUserId: Int = 1
+    private var selectedPhotoUri: Uri? = null
+
+    private val viewModel: ExpenseViewModel by viewModels {
+        val database = AppDatabase.getDatabase(requireContext())
+        val repository = BudgetRepository(database.appDao())
+        ExpenseViewModelFactory(repository)
+    }
+
+    private val calendar = Calendar.getInstance()
+    private var startDate: Long = System.currentTimeMillis()
+    private var endDate: Long = System.currentTimeMillis()
+
+    private val photoPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let {
+            selectedPhotoUri = it
+            binding.ivExpensePhoto.visibility = View.VISIBLE
+            Glide.with(this).load(it).centerCrop().into(binding.ivExpensePhoto)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        arguments?.let {
+            categoryId = it.getInt("categoryId", -1)
+            categoryName = it.getString("categoryName")
+            currentUserId = it.getInt("userId", 1)
+        }
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentExpenseBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        binding.tvCategoryHeader.text = "Category: ${categoryName ?: "Unknown"}"
+
+        binding.btnPickStartDate.setOnClickListener { showDatePicker(true) }
+        binding.btnPickEndDate.setOnClickListener { showDatePicker(false) }
+        binding.btnAddPhoto.setOnClickListener { photoPickerLauncher.launch("image/*") }
+
+        binding.btnSaveExpense.setOnClickListener {
+            saveExpense()
+        }
+    }
+
+    private fun showDatePicker(isStartDate: Boolean) {
+        val dateSetListener = DatePickerDialog.OnDateSetListener { _, year, month, dayOfMonth ->
+            val selectedCalendar = Calendar.getInstance()
+            selectedCalendar.set(year, month, dayOfMonth)
+            val format = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val dateText = format.format(selectedCalendar.time)
+
+            if (isStartDate) {
+                startDate = selectedCalendar.timeInMillis
+                binding.btnPickStartDate.text = "Start: $dateText"
+            } else {
+                endDate = selectedCalendar.timeInMillis
+                binding.btnPickEndDate.text = "End: $dateText"
+            }
+        }
+
+        DatePickerDialog(requireContext(), dateSetListener, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
+    private fun saveExpense() {
+        val name = binding.etExpenseName.text.toString().trim()
+        val description = binding.etDescription.text.toString().trim()
+        val minGoalStr = binding.etMinGoal.text.toString().trim()
+        val maxGoalStr = binding.etMaxGoal.text.toString().trim()
+        val priorityStr = binding.etPriority.text.toString().trim()
+
+        if (name.isEmpty() || description.isEmpty() || minGoalStr.isEmpty() || maxGoalStr.isEmpty()) {
+            Toast.makeText(requireContext(), "Please fill all fields", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val minGoal = minGoalStr.toDoubleOrNull()
+        val maxGoal = maxGoalStr.toDoubleOrNull()
+        val priority = priorityStr.toIntOrNull() ?: 0
+
+        if (minGoal == null || maxGoal == null) {
+            Toast.makeText(requireContext(), "Invalid goals", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (endDate < startDate) {
+            Toast.makeText(requireContext(), "End date cannot be before start date", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (categoryId == -1) {
+            Toast.makeText(requireContext(), "Category error", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        selectedPhotoUri?.let { uri ->
+            try {
+                requireContext().contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {}
+        }
+
+        viewModel.saveExpense(name, description, minGoal, maxGoal, startDate, endDate, categoryId, currentUserId, selectedPhotoUri?.toString(), priority, 0.0)
+
+        Toast.makeText(requireContext(), "Expense Saved!", Toast.LENGTH_SHORT).show()
+        findNavController().popBackStack()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}

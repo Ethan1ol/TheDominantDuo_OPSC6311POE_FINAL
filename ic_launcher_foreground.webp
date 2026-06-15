@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="250dp"
+    android:viewportWidth="200"
+    android:viewportHeight="250">
+    <!-- Coin Pile -->
+    <path
+        android:fillColor="#FFFFD700"
+        android:pathData="M35,230 L165,230 C165,240 155,250 145,250 L55,250 C45,250 35,240 35,230 Z" />
+    <path
+        android:fillColor="#FFFFD700"
+        android:pathData="M35,230 L165,230 L165,50 L35,50 Z" />
+</vector>

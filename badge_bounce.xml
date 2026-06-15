@@ -1,0 +1,36 @@
+package com.example.opsc_ec.database
+
+import kotlinx.coroutines.flow.Flow
+
+
+class BudgetRepository(private val appDao: AppDao) {
+
+    fun getCategoriesWithTotalsForPeriod(userId: Int, rangeStart: Long, rangeEnd: Long) =
+        appDao.getCategoriesWithTotalsForPeriod(userId, rangeStart, rangeEnd)
+
+    suspend fun insertCategory(category: Category) {
+        appDao.insertCategory(category)
+    }
+
+
+    suspend fun insertExpense(expense: Expense) {
+        appDao.insertExpense(expense)
+    }
+
+    fun getExpensesForCategory(categoryId: Int): Flow<List<Expense>> =
+        appDao.getExpensesForCategory(categoryId)
+
+    fun getExpensesForCategoryAndPeriod(categoryId: Int, rangeStart: Long, rangeEnd: Long): Flow<List<Expense>> =
+        appDao.getExpensesForCategoryAndPeriod(categoryId, rangeStart, rangeEnd)
+
+    suspend fun updateActualSpent(expenseId: Int, amount: Double) {
+        appDao.updateActualSpent(expenseId, amount)
+    }
+
+
+    suspend fun getUserByUsername(username: String): User? = 
+        appDao.getUserByUsername(username)
+
+    suspend fun insertUser(user: User): Long = 
+        appDao.insertUser(user)
+}

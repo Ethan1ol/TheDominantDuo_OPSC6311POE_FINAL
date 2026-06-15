@@ -1,0 +1,68 @@
+package com.example.opsc_ec.database
+
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "users")
+data class User(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val username: String,
+    val password: String,
+    val name: String? = null,
+    val surname: String? = null,
+    val email: String? = null,
+    val phoneNumber: String? = null
+)
+
+@Entity(tableName = "categories")
+data class Category(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val userId: Int,
+    val priority: Int = 0,
+    val isGoal: Boolean = false,
+    val targetAmount: Double = 0.0
+)
+
+@Entity(
+    tableName = "expenses",
+    foreignKeys = [
+        ForeignKey(
+            entity = User::class,
+            parentColumns = ["id"],
+            childColumns = ["userId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = Category::class,
+            parentColumns = ["id"],
+            childColumns = ["categoryId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
+data class Expense(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val description: String,
+    val minGoal: Double,
+    val maxGoal: Double,
+    var actualSpent: Double = 0.0,
+    val startDate: Long,
+    val endDate: Long,
+    val dateAdded: Long = System.currentTimeMillis(),
+    val categoryId: Int,
+    val userId: Int,
+    val photoPath: String? = null,
+    val priority: Int = 0
+)
+
+@Entity(tableName = "budget_goals")
+data class BudgetGoal(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val userId: Int,
+    val minGoal: Double,
+    val maxGoal: Double,
+    val monthYear: String
+)

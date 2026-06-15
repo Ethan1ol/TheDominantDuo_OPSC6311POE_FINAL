@@ -1,0 +1,149 @@
+package com.example.opsc_ec.ui
+
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.example.opsc_ec.R
+import com.example.opsc_ec.database.CategoryWithTotal
+import com.example.opsc_ec.databinding.ItemCategoryBinding
+import java.util.Locale
+
+class CategoryAdapter(private val onCategoryClick: (CategoryWithTotal) -> Unit) : 
+    ListAdapter<CategoryWithTotal, CategoryAdapter.CategoryViewHolder>(CategoryDiffCallback()) {
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CategoryViewHolder {
+        val binding = ItemCategoryBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return CategoryViewHolder(binding, onCategoryClick)
+    }
+
+    override fun onBindViewHolder(holder: CategoryViewHolder, position: Int) {
+        holder.bind(getItem(position))
+    }
+
+    class CategoryViewHolder(
+        private val binding: ItemCategoryBinding,
+        private val onCategoryClick: (CategoryWithTotal) -> Unit
+    ) : RecyclerView.ViewHolder(binding.root) {
+
+        fun bind(category: CategoryWithTotal) {
+
+
+            binding.tvCategoryName.text =
+                category.name
+
+
+            binding.tvPriority.text = "Prio: ${category.priority}"
+
+
+            val spent =
+                category.totalAmount ?: 0.0
+
+
+            binding.tvTotalAmount.text =
+                String.format(
+                    Locale.getDefault(),
+                    "R %.2f",
+                    spent
+                )
+
+
+
+            val min =
+                category.minGoal ?: 0.0
+
+
+            val max =
+                if (category.isGoal) category.targetAmount else (category.maxGoal ?: 0.0)
+
+
+
+            // calculate progress
+            val progress =
+                if(max > 0)
+                    ((spent / max) * 100).toInt()
+                else
+                    0
+
+
+            if ((spent <= max) && (max > 0) && !category.isGoal) {
+                if (binding.tvBadge.visibility != android.view.View.VISIBLE) {
+                    binding.tvBadge.visibility = android.view.View.VISIBLE
+                    val animation = android.view.animation.AnimationUtils.loadAnimation(binding.root.context, R.anim.badge_bounce)
+                    binding.tvBadge.startAnimation(animation)
+                }
+            } else if (category.isGoal && (progress >= 100)) {
+                 if (binding.tvBadge.visibility != android.view.View.VISIBLE) {
+                    binding.tvBadge.visibility = android.view.View.VISIBLE
+                    binding.tvBadge.text = binding.root.context.getString(R.string.goal_reached_badge)
+                    val animation = android.view.animation.AnimationUtils.loadAnimation(binding.root.context, R.anim.badge_bounce)
+                    binding.tvBadge.startAnimation(animation)
+                }
+            } else {
+                binding.tvBadge.visibility = android.view.View.GONE
+            }
+
+
+            binding.categoryProgress.progress =
+                progress.coerceAtMost(100)
+
+
+
+            val status = when {
+                category.isGoal -> {
+                    binding.root.context.getString(R.string.saved_status, spent, max, progress)
+                }
+
+                spent < min -> {
+
+                    "Below Minimum ✅"
+
+                }
+
+
+                spent <= max -> {
+
+                    "Within Goal 👍"
+
+                }
+
+
+                else -> {
+
+                    "Over Budget ❌"
+
+                }
+
+            }
+
+
+
+            binding.tvGoalStatus.text = if (category.isGoal) {
+                status
+            } else {
+                "Min: R%.2f  Max: R%.2f\n$status"
+                    .format(min, max)
+            }
+
+
+
+            binding.root.setOnClickListener {
+
+                onCategoryClick(category)
+
+            }
+
+        }
+    }
+
+    class CategoryDiffCallback : DiffUtil.ItemCallback<CategoryWithTotal>() {
+        override fun areItemsTheSame(oldItem: CategoryWithTotal, newItem: CategoryWithTotal): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: CategoryWithTotal, newItem: CategoryWithTotal): Boolean {
+            return oldItem == newItem
+        }
+    }
+}
