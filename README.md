@@ -65,4 +65,6 @@ The green line indicating the min amount
 the red indicating max amount.
 The category for example is food and the total spent for the category food is the R1100
 
+YOUTUBE LINK:
+https://youtu.be/kZr8vB0lHWY
 
