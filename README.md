@@ -65,46 +65,4 @@ The green line indicating the min amount
 the red indicating max amount.
 The category for example is food and the total spent for the category food is the R1100
 
-Drop down
-<img width="246" height="50" alt="image" src="https://github.com/user-attachments/assets/c5773aea-592e-47be-9e2f-8941c31cf126" />
-All is a drop down feature which will show only the graph and the categories of the corrisponding month
-Jan month chosen
-<img width="246" height="414" alt="image" src="https://github.com/user-attachments/assets/0e383739-72e7-47e9-94f5-2563b2e83d4e" />
-This shows everything in jan
 
-June
-<img width="247" height="295" alt="image" src="https://github.com/user-attachments/assets/ea2795f5-2058-4c74-830e-abad1e2a784f" />
-
-This shows everything in june
-
-May
-<img width="255" height="344" alt="image" src="https://github.com/user-attachments/assets/dcf2b61a-8491-45a9-aeae-1b37f76370b7" />
-
-Feature 1
-Goal system
-The goal system is a savings category. It allows the user to create a saving goal where the user can enter different amounts of savings that theyve made and put into their goal. The goal will visually represent if as a good job feature letting the user know that they made good progress with their saving.keeping them motivated and have a light mood.
-
-<img width="431" height="917" alt="image" src="https://github.com/user-attachments/assets/6ca9efc7-42b8-46fd-bcde-df59fb50dc08" />
-
-
-This is the Icon 
-
-
-
-This is where you will enter the savinging amount and the goal will be measured off the amount you saved that you have entered.
-
-
-
-Feature 2
-Priority feature
-This feature will allow the user to rate their category priority from 0-9 with 0 being the lowest and 9 being the highest priority. It appears on the side of the category box, as a number from 0=9. Thus allow the user to focus on the most important categories/expenses. This feature can also be used in the savings category allowing a user to prioritize their savings as well. The category will be organized in the order of its importantance having the prioritized ones at the top of the list.
-
-<img width="357" height="210" alt="image" src="https://github.com/user-attachments/assets/bdc76fdd-4ad2-4597-8831-df36c7655dcf" />
-
-
-this is the area you rate how important it is
-
-
-
-
-example of the priority list starting from most important
